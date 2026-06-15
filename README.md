@@ -1,6 +1,6 @@
 # AI-Trust Forensic Suite
 
-**Interactive Web Application:** [https://datscapstoneproject.streamlit.app/](https://datscapstoneproject.streamlit.app/)
+**Interactive Web Application:** Currently Unavailable
 
 This repository contains the code and model weights for a multi-task deep learning forensic tool designed to detect AI-generated images and attribute them to their specific source generator. The project was developed as a Capstone for DATS 6499 at George Washington University.
 
