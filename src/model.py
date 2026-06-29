@@ -78,14 +78,22 @@ class AIForensicModel(nn.Module):
     def _freeze_layers(self, num_frozen: int):
         """Freeze the embeddings and the first `num_frozen` encoder layers."""
         # Freeze patch + position embeddings
-        for param in self.backbone.embeddings.parameters():
-            param.requires_grad = False
+        if hasattr(self.backbone, 'embeddings'):
+            for param in self.backbone.embeddings.parameters():
+                param.requires_grad = False
 
         # Freeze specified number of encoder layers
-        for i, layer in enumerate(self.backbone.encoder.layer):
-            if i < num_frozen:
-                for param in layer.parameters():
-                    param.requires_grad = False
+        if hasattr(self.backbone, 'encoder') and hasattr(self.backbone.encoder, 'layer'):
+            for i, layer in enumerate(self.backbone.encoder.layer):
+                if i < num_frozen:
+                    for param in layer.parameters():
+                        param.requires_grad = False
+        elif hasattr(self.backbone, 'transformer') and hasattr(self.backbone.transformer, 'layer'):
+            # Alternative structure in some library versions
+            for i, layer in enumerate(self.backbone.transformer.layer):
+                if i < num_frozen:
+                    for param in layer.parameters():
+                        param.requires_grad = False
 
     def _init_heads(self):
         """Xavier initialization for classification head linear layers."""
@@ -139,15 +147,21 @@ class MultiTaskLoss(nn.Module):
     """
     Combined cross-entropy loss for both classification heads.
 
-    Loss = alpha * CE(head_a) + beta * CE(head_b)
+    Loss = alpha * CE(head_a, weighted) + beta * CE(head_b)
+
+    Head A uses class weights to handle the 1:5 imbalance (Real vs Synthetic).
+    Both heads use label smoothing (0.1) to prevent overconfidence.
     """
 
-    def __init__(self, alpha: float = 1.0, beta: float = 1.0):
+    def __init__(self, alpha: float = 1.0, beta: float = 1.0, class_weights_a=None):
         super().__init__()
         self.alpha = alpha
         self.beta = beta
-        self.ce_a = nn.CrossEntropyLoss()
-        self.ce_b = nn.CrossEntropyLoss()
+
+        # Weighted CE for Head A — penalize Real misclassification 5x more
+        weight_a = torch.tensor(class_weights_a) if class_weights_a else None
+        self.ce_a = nn.CrossEntropyLoss(weight=weight_a, label_smoothing=0.1)
+        self.ce_b = nn.CrossEntropyLoss(label_smoothing=0.1)
 
     def forward(self, logits_a, logits_b, labels_a, labels_b):
         """
@@ -164,3 +178,4 @@ class MultiTaskLoss(nn.Module):
             "loss_a": loss_a,
             "loss_b": loss_b,
         }
+
