@@ -164,10 +164,31 @@ def load_model(checkpoint_path: str = None):
 
     if checkpoint_path and os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
-        # Use strict=False to ignore minor architecture differences (e.g. pooler/classifier)
-        missing, unexpected = model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-        print(f"Missing keys: {missing}")
-        print(f"Unexpected keys: {unexpected}")
+        state_dict = checkpoint.get("model_state_dict", checkpoint)
+        
+        # Dynamically map keys in case transformers version changes ViTModel structure 
+        # (e.g. from backbone.encoder -> backbone.transformer)
+        model_keys = set(model.state_dict().keys())
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            if k in model_keys:
+                new_state_dict[k] = v
+            else:
+                # Attempt common substitutions
+                alt_k1 = k.replace("backbone.encoder.", "backbone.transformer.")
+                alt_k2 = k.replace("backbone.transformer.", "backbone.encoder.")
+                if alt_k1 in model_keys:
+                    new_state_dict[alt_k1] = v
+                elif alt_k2 in model_keys:
+                    new_state_dict[alt_k2] = v
+                else:
+                    new_state_dict[k] = v
+                    
+        missing, unexpected = model.load_state_dict(new_state_dict, strict=False)
+        if len(missing) > 10: # A few missing keys like pooler/classifier are expected
+            print(f"WARNING: High number of missing keys ({len(missing)}). Model may not predict correctly.")
+        print(f"Missing keys: {missing[:5]}...")
+        print(f"Unexpected keys: {unexpected[:5]}...")
 
     model.to(device)
     model.eval()
