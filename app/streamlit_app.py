@@ -164,7 +164,10 @@ def load_model(checkpoint_path: str = None):
 
     if checkpoint_path and os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        # Use strict=False to ignore minor architecture differences (e.g. pooler/classifier)
+        missing, unexpected = model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+        print(f"Missing keys: {missing}")
+        print(f"Unexpected keys: {unexpected}")
 
     model.to(device)
     model.eval()
