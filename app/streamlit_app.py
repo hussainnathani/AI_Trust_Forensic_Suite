@@ -156,18 +156,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_model(checkpoint_path: str = None):
     """Load the trained AIForensicModel from a checkpoint file."""
     device = torch.device("cpu")
     model = AIForensicModel()
 
     if checkpoint_path and os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint["model_state_dict"])
-        st.sidebar.success("Model loaded successfully")
-    else:
-        st.sidebar.warning("No checkpoint found — running untrained model")
 
     model.to(device)
     model.eval()
@@ -243,13 +240,18 @@ def main():
 
         st.markdown("""
         <div class="sidebar-block">
-            <strong>DATS 6499 Capstone Project</strong><br>
-            Mohammed Hussain Nathani<br>
-            George Washington University
+            <strong>AI-Trust Forensic Suite</strong><br>
+            Multi-task detection and attribution of AI-generated images with explainable visual evidence.
         </div>
         """, unsafe_allow_html=True)
 
-    model, device = load_model(checkpoint_path)
+    with st.spinner("Loading Model..."):
+        model, device = load_model(checkpoint_path)
+    
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        st.sidebar.success("Model loaded successfully")
+    else:
+        st.sidebar.warning("No checkpoint found — running untrained model")
 
     uploaded_file = st.file_uploader(
         "Upload an image for forensic analysis",
